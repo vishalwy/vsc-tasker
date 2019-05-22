@@ -1,0 +1,43 @@
+{
+  "name": "tasker",
+  "displayName": "Tasker",
+  "description": "Execute tasks and return thenable with output",
+  "version": "0.0.1",
+  "publisher": "vishalwy",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vishalwy/vsc-tasker.git"
+  },
+  "engines": {
+    "vscode": "^1.32.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "task",
+    "input command variable",
+    "task output"
+  ],
+  "activationEvents": [
+    "*",
+    "onCommand:tasker.run"
+  ],
+  "main": "./out/extension",
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "postinstall": "node ./node_modules/vscode/bin/install",
+    "test": "npm run compile && node ./node_modules/vscode/bin/test",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/mocha": "^2.2.42",
+    "@types/node": "^7.0.43",
+    "tslint": "^5.8.0",
+    "typescript": "^2.6.1",
+    "vsce": "^1.61.0",
+    "vscode": "^1.1.32"
+  }
+}
