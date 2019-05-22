@@ -1,7 +1,7 @@
 {
   "name": "tasker",
   "displayName": "Tasker",
-  "description": "Execute tasks and return thenable with output",
+  "description": "Execute the given task and return the output",
   "version": "0.0.1",
   "publisher": "vishalwy",
   "repository": {

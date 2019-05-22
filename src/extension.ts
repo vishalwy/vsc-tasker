@@ -75,7 +75,7 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 
 			function setWriteDataHandler(terminal: vscode.Terminal): boolean {
-				if(terminal.name.endsWith(tasker.name)) {
+				if(terminal.name.indexOf('Task - ' + tasker.name) >= 0) {
 					writeDataHandler = (<any>terminal).onDidWriteData((data: any) => {
 						tasker.append(data);
 					});
