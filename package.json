@@ -2,7 +2,7 @@
   "name": "tasker",
   "displayName": "Tasker",
   "description": "Execute the given task and return the output",
-  "version": "0.0.1",
+  "version": "0.1.1",
   "publisher": "vishalwy",
   "repository": {
     "type": "git",
@@ -17,11 +17,13 @@
   "keywords": [
     "task",
     "input command variable",
-    "task output"
+    "task output",
+    "configure tasks"
   ],
   "activationEvents": [
     "*",
-    "onCommand:tasker.run"
+    "onCommand:tasker.run",
+    "onCommand:tasker.configure"
   ],
   "main": "./out/extension",
   "scripts": {
@@ -31,6 +33,10 @@
     "postinstall": "node ./node_modules/vscode/bin/install",
     "test": "npm run compile && node ./node_modules/vscode/bin/test",
     "package": "vsce package"
+  },
+  "dependencies": {
+    "@types/mustache": "^0.8.32",
+    "mustache": "^2.3.0"
   },
   "devDependencies": {
     "@types/mocha": "^2.2.42",
