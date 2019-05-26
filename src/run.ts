@@ -4,55 +4,55 @@ import * as vscode from 'vscode';
 class Tasker {
   public readonly name: string;
   private trimOutput: boolean;
-	private output: string;
-	public taskExec: vscode.TaskExecution | null;
+  private output: string;
+  public taskExec: vscode.TaskExecution | null;
 
-	private promise: {
-		resolve?: (value?: any) => void;
-		reject?: (error?: any) => void;
-	};
-	
-	public constructor(name: string, trimOutput: boolean = true) {
+  private promise: {
+    resolve?: (value?: any) => void;
+    reject?: (error?: any) => void;
+  };
+
+  public constructor(name: string, trimOutput: boolean = true) {
     this.name = name;
     this.trimOutput = trimOutput;
-		this.output = '';
-		this.promise = {};
-		this.resolve = this.resolve.bind(this);
-		this.reject = this.reject.bind(this);
-		this.taskExec = null;
-	}
+    this.output = '';
+    this.promise = {};
+    this.resolve = this.resolve.bind(this);
+    this.reject = this.reject.bind(this);
+    this.taskExec = null;
+  }
 
-	public resolve(value?: any) {
-		if(typeof value == 'undefined')
+  public resolve(value?: any) {
+    if(typeof value == 'undefined')
       value = this.trimOutput ? this.output.trim() : this.output;
 
-		this.promise.resolve && this.promise.resolve(value);
-	}
+    this.promise.resolve && this.promise.resolve(value);
+  }
 
-	private reject(error?: any) {
-		this.promise.reject && this.promise.reject(error);
-	}
+  private reject(error?: any) {
+    this.promise.reject && this.promise.reject(error);
+  }
 
-	public run(args: {name: string}): Promise<string> {
-		return new Promise((resolve, reject) => {
-			this.promise = {resolve, reject};
-			
-			vscode.tasks.fetchTasks().then((tasks: vscode.Task[]) => {
-				for(let i = 0; i < tasks.length; ++i) {
-					if(tasks[i].name == args.name)			
-						return vscode.tasks.executeTask(tasks[i]).then((taskExec: vscode.TaskExecution) => {
-							this.taskExec = taskExec;
-						}, this.reject);
-				}
+  public run(args: {name: string}): Promise<string> {
+    return new Promise((resolve, reject) => {
+      this.promise = {resolve, reject};
+      
+      vscode.tasks.fetchTasks().then((tasks: vscode.Task[]) => {
+        for(let i = 0; i < tasks.length; ++i) {
+          if(tasks[i].name == args.name)			
+            return vscode.tasks.executeTask(tasks[i]).then((taskExec: vscode.TaskExecution) => {
+              this.taskExec = taskExec;
+            }, this.reject);
+        }
 
-				this.reject(new Error('No task found'));
-			}, this.reject);
-		});
-	}
+        this.reject(new Error('No task found'));
+      }, this.reject);
+    });
+  }
 
-	public append(data: string) {
-		this.output += data;
-	}
+  public append(data: string) {
+    this.output += data;
+  }
 }
 
 export function run(args: {name: string, trimOutput?: boolean}) {
