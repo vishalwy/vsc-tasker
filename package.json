@@ -26,6 +26,15 @@
     "onCommand:tasker.configure"
   ],
   "main": "./out/extension",
+  "contributes": {
+    "commands": [
+      {
+        "title": "Configure",
+        "command": "tasker.configure",
+        "category": "Tasker"
+      }
+    ]
+  },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
@@ -35,11 +44,13 @@
     "package": "vsce package"
   },
   "dependencies": {
-    "@types/mustache": "^0.8.32",
-    "mustache": "^2.3.0"
+    "mustache": "^2.3.0",
+    "ncp": "^2.0.0"
   },
   "devDependencies": {
     "@types/mocha": "^2.2.42",
+    "@types/mustache": "^0.8.32",
+    "@types/ncp": "^2.0.1",
     "@types/node": "^7.0.43",
     "tslint": "^5.8.0",
     "typescript": "^2.6.1",

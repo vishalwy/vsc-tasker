@@ -1,5 +1,6 @@
 'use strict';
 import * as vscode from 'vscode';
+import * as types from './types';
 
 class Tasker {
   public readonly name: string;
@@ -22,14 +23,14 @@ class Tasker {
     this.taskExec = null;
   }
 
-  public resolve(value?: any) {
+  public resolve(value?: any): void {
     if(typeof value == 'undefined')
       value = this.trimOutput ? this.output.trim() : this.output;
 
     this.promise.resolve && this.promise.resolve(value);
   }
 
-  private reject(error?: any) {
+  private reject(error?: any): void {
     this.promise.reject && this.promise.reject(error);
   }
 
@@ -37,10 +38,10 @@ class Tasker {
     return new Promise((resolve, reject) => {
       this.promise = {resolve, reject};
       
-      vscode.tasks.fetchTasks().then((tasks: vscode.Task[]) => {
+      vscode.tasks.fetchTasks().then((tasks) => {
         for(let i = 0; i < tasks.length; ++i) {
           if(tasks[i].name == args.name)			
-            return vscode.tasks.executeTask(tasks[i]).then((taskExec: vscode.TaskExecution) => {
+            return vscode.tasks.executeTask(tasks[i]).then((taskExec) => {
               this.taskExec = taskExec;
             }, this.reject);
         }
@@ -50,12 +51,12 @@ class Tasker {
     });
   }
 
-  public append(data: string) {
+  public append(data: string): void {
     this.output += data;
   }
 }
 
-export function run(args: {name: string, trimOutput?: boolean}) {
+export function run(args: types.RunArgs): Promise<string> {
   return new Promise((resolve, reject) => {
     args = args || {};
 
@@ -87,7 +88,7 @@ export function run(args: {name: string, trimOutput?: boolean}) {
       return false;
     }
 
-    startTaskHandler = vscode.tasks.onDidStartTask((e: vscode.TaskStartEvent) => {
+    startTaskHandler = vscode.tasks.onDidStartTask((e) => {
       if(!tasker || tasker.name != e.execution.task.name)
         return;
 
@@ -100,20 +101,20 @@ export function run(args: {name: string, trimOutput?: boolean}) {
       }
 
       if(!writeDataHandler) {
-        openTerminalHandler = vscode.window.onDidOpenTerminal((terminal: vscode.Terminal) => {
+        openTerminalHandler = vscode.window.onDidOpenTerminal((terminal) => {
           setWriteDataHandler(terminal);
         }); 
       }
     });
 
-    endTaskHandler = vscode.tasks.onDidEndTask((e: vscode.TaskEndEvent) => {
+    endTaskHandler = vscode.tasks.onDidEndTask((e) => {
       tasker.name == e.execution.task.name && tasker.resolve();
     });
 
-    tasker.run(args).then((value?: any) => {
+    tasker.run(args).then((value) => {
       done();
       resolve(value);
-    }, (error?: any) => {
+    }, (error) => {
       done();
       reject(error);
     });
