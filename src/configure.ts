@@ -10,7 +10,7 @@ const mustache = require('mustache');
 mustache.escape = (text: string) => JSON.stringify(text).replace(/(^")|("$)/g, '');
 
 class Variables {
-  private variables: types.VariableConfig;
+  private variables: {[variableName: string]: string};
 
   public constructor() {
     this.variables = {};
@@ -123,8 +123,8 @@ export function configure(args: types.ConfigureArgs): Promise<string> {
     }
 
     function processFolder(folder: vscode.WorkspaceFolder): void {
-      if(args.vscodeDir)
-        return execute(folder, args.vscodeDir);
+      if(args.templateDir)
+        return execute(folder, args.templateDir);
 
       vscode.window.showOpenDialog({
         canSelectFiles: false,

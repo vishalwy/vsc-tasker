@@ -4,6 +4,7 @@
   "description": "Execute the given task and return the output",
   "version": "0.1.1",
   "publisher": "vishalwy",
+  "homepage": "https://github.com/vishalwy/vsc-tasker/blob/master/README.md",
   "repository": {
     "type": "git",
     "url": "https://github.com/vishalwy/vsc-tasker.git"
