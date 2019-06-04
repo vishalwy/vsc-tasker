@@ -26,11 +26,12 @@ Arguments can be supplied in the format given below
 }
 ```
 
+
 ## tasker.run
 * Command invokes the task and returns `Promise<string>`.
 * Meant to be used programmatically or from the input command variable.
 
-The command accepts the arguments in the format given below
+Arguments can be supplied in the format given below
 ```typescript
 {
   name: string,  //task name

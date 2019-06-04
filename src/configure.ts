@@ -75,12 +75,12 @@ export function configure(args: types.ConfigureArgs): Promise<string> {
   return new Promise((resolve, reject) => {
     args = args || {};
     const folders = vscode.workspace.workspaceFolders || [];
-    const promises: Promise<boolean>[] = [];
 
     function execute(folder: vscode.WorkspaceFolder, srcDir: string): void {
       const variables = new Variables();
       let tgtDir = path.join(folder.uri.fsPath, '.vscode');
       let variablesFile = path.join(srcDir, 'variables.json');
+      let templateFiles: string[] = [];
 
       if(!fs.existsSync(variablesFile) || !fs.lstatSync(variablesFile).isFile()) {
         vscode.window.showWarningMessage(
@@ -94,7 +94,7 @@ export function configure(args: types.ConfigureArgs): Promise<string> {
           return resolve();
 
         srcDir = fs.realpathSync(srcDir);
-        tgtDir = fs.realpathSync(tgtDir);
+        tgtDir = fs.existsSync(tgtDir) ? fs.realpathSync(tgtDir) : tgtDir;
         const isSrcNotTgt = srcDir != tgtDir;
 
         ncp(srcDir, tgtDir, {
@@ -103,9 +103,8 @@ export function configure(args: types.ConfigureArgs): Promise<string> {
           filter(srcFile) {
             if(srcFile.endsWith(TEMPLATE_FILE_EXT) && path.basename(srcFile) != TEMPLATE_FILE_EXT && 
               fs.lstatSync(srcFile).isFile()) {
-              const tgtFile = path.join(tgtDir, path.relative(srcDir, srcFile)).slice(0, -1 * TEMPLATE_FILE_EXT.length);
-              promises.push(variables.eval(srcFile, tgtFile));
-              return false;
+              templateFiles.push(srcFile);
+              return isSrcNotTgt;
             }
 
             return isSrcNotTgt || fs.lstatSync(srcFile).isDirectory();
@@ -113,6 +112,11 @@ export function configure(args: types.ConfigureArgs): Promise<string> {
         }, (error?: Error) => {
           if(error)
             return reject(error);
+
+          const promises = templateFiles.map((srcFile) => {
+            const tgtFile = path.relative(srcDir, srcFile).slice(0, -1 * TEMPLATE_FILE_EXT.length);
+            return variables.eval(srcFile, path.join(tgtDir, tgtFile));
+          });
 
           Promise.all(promises).then(() => {
             vscode.window.showInformationMessage(`Configured ${folder.uri.path}`);
