@@ -18,36 +18,44 @@ class Tasker {
     this.trimOutput = trimOutput;
     this.output = '';
     this.promise = {};
-    this.resolve = this.resolve.bind(this);
-    this.reject = this.reject.bind(this);
     this.taskExec = null;
   }
 
-  public resolve(value?: any): void {
-    if(typeof value == 'undefined')
-      value = this.trimOutput ? this.output.trim() : this.output;
+  public resolve(value?: any): boolean {
+    if(this.promise.resolve) {
+      if(typeof value == 'undefined')
+        value = this.trimOutput ? this.output.trim() : this.output;
 
-    this.promise.resolve && this.promise.resolve(value);
+      this.promise.resolve(value);
+      return true;
+    }
+
+    return false;
   }
 
-  private reject(error?: any): void {
-    this.promise.reject && this.promise.reject(error);
+  private reject(error?: any): boolean {
+    if(this.promise.reject) {
+      this.promise.reject(error || new Error(`${this.name} - Failed run!`));
+      return true;
+    }
+    
+    return false;
   }
 
-  public run(args: {name: string}): Promise<string> {
+  public run(): Promise<string> {
     return new Promise((resolve, reject) => {
       this.promise = {resolve, reject};
       
       vscode.tasks.fetchTasks().then((tasks) => {
         for(let i = 0; i < tasks.length; ++i) {
-          if(tasks[i].name == args.name)			
+          if(tasks[i].name == this.name)			
             return vscode.tasks.executeTask(tasks[i]).then((taskExec) => {
               this.taskExec = taskExec;
-            }, this.reject);
+            }, reject);
         }
 
-        this.reject(new Error('No task found'));
-      }, this.reject);
+        reject(new Error(`${this.name} - Task not found`));
+      }, reject);
     });
   }
 
@@ -111,7 +119,7 @@ export function run(args: types.RunArgs): Promise<string> {
       tasker.name == e.execution.task.name && tasker.resolve();
     });
 
-    tasker.run(args).then((value) => {
+    tasker.run().then((value) => {
       done();
       resolve(value);
     }, (error) => {

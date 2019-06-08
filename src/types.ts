@@ -10,8 +10,30 @@ export interface ConfigureArgs {
 }
 
 export interface VariableConfig {
-  [variableName: string]: {  //variable name
+  [variableName: string]: {  //variable name should match regex ^[A-Z0-9_]+$
     description?: string,  //description of the variable to be shown
-    default?: string  //default value for the variable
+    values?: string[]  //values.length > 1 shows a list, else an input box with values[0] filled in
   }
+}
+
+export const VariableSchema = {
+  'type': 'object',
+  'patternProperties': {
+    '^[A-Z0-9_]+$': {
+      'type': 'object',
+      'properties': {
+        'description': {
+          'type': 'string'
+        },
+        'values': {
+          'type': 'array',
+          'items': {
+            'type': 'string'
+          }
+        }
+      },
+      'additionalProperties': false
+    }
+  },
+  'additionalProperties': false
 }

@@ -2,7 +2,7 @@
   "name": "tasker",
   "displayName": "Tasker",
   "description": "Execute the given task and return the output",
-  "version": "0.1.1",
+  "version": "1.1.1",
   "publisher": "vishalwy",
   "homepage": "https://github.com/vishalwy/vsc-tasker/blob/master/README.md",
   "repository": {
@@ -45,6 +45,7 @@
     "package": "vsce package"
   },
   "dependencies": {
+    "jsonschema": "^1.2.4",
     "mustache": "^2.3.0",
     "ncp": "^2.0.0"
   },

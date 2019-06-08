@@ -3,9 +3,11 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import {ncp} from 'ncp';
+import {Validator} from 'jsonschema';
 import * as types from './types';
 
-const TEMPLATE_FILE_EXT = '.tct';
+const TEMPLATE_FILE_TYPE = '.tct';
+const VARIABLE_FILE_NAME = 'tasker.variables.json'
 const mustache = require('mustache');
 mustache.escape = (text: string) => JSON.stringify(text).replace(/(^")|("$)/g, '');
 
@@ -21,11 +23,17 @@ class Variables {
       fs.readFile(variablesFile, (error, data) => {
         if(error)
           return reject(error);
+
+        let config: types.VariableConfig, variables: string[];
   
         try {
-          var configs = JSON.parse(data.toString('utf8'));
-          var keys = Object.keys(configs);
-          var variables = keys.filter((key) => key.match(/^[A-Z0-9_]+$/) != null && key);
+          config = JSON.parse(data.toString('utf8'));
+          const validation = (new Validator()).validate(config, types.VariableSchema);
+
+          if(validation.errors.length)
+            throw new Error(`${validation.errors[0].property} - ${validation.errors[0].message}`)
+
+          variables = Object.keys(config);
         } catch(error) {
           return reject(error);
         }
@@ -35,13 +43,25 @@ class Variables {
             return resolve(true);
 
           const variable = variables[index];
-          const config = configs[variable];
+          const description = config[variable].description || variable;
+          const values = config[variable].values || [];
+          let input: Thenable<string | undefined>;
 
-          vscode.window.showInputBox({
-            prompt: config.description || variable,
-            value: config.default || '',
-            ignoreFocusOut: true,
-          }).then((value) => {
+          if(values.length > 1) {
+            input = vscode.window.showQuickPick(values, {
+              placeHolder: description,
+              ignoreFocusOut: true,
+              canPickMany: false
+            })
+          } else {
+            input = vscode.window.showInputBox({
+              prompt: description,
+              ignoreFocusOut: true,
+              value: values.length ? values[0] : ''
+            })  
+          }
+
+          input.then((value) => {
             if(!value)
               return resolve();
 
@@ -50,10 +70,7 @@ class Variables {
           }, reject);
         };
        
-        if(keys.length != variables.length)
-          reject(new Error(`${variablesFile} contains invalid variables`));
-        else
-          getVariables(0);
+        getVariables(0);
       });
     });
   }
@@ -79,12 +96,12 @@ export function configure(args: types.ConfigureArgs): Promise<string> {
     function execute(folder: vscode.WorkspaceFolder, srcDir: string): void {
       const variables = new Variables();
       let tgtDir = path.join(folder.uri.fsPath, '.vscode');
-      let variablesFile = path.join(srcDir, 'variables.json');
+      let variablesFile = path.join(srcDir, VARIABLE_FILE_NAME);
       let templateFiles: string[] = [];
 
       if(!fs.existsSync(variablesFile) || !fs.lstatSync(variablesFile).isFile()) {
         vscode.window.showWarningMessage(
-          `${variablesFile} does not exist! ${TEMPLATE_FILE_EXT} files may render incompete`
+          `${variablesFile} does not exist! ${TEMPLATE_FILE_TYPE} files may render incompete`
         );
         variablesFile = '';
       }
@@ -101,7 +118,7 @@ export function configure(args: types.ConfigureArgs): Promise<string> {
           stopOnErr: true, 
 
           filter(srcFile) {
-            if(srcFile.endsWith(TEMPLATE_FILE_EXT) && path.basename(srcFile) != TEMPLATE_FILE_EXT && 
+            if(srcFile.endsWith(TEMPLATE_FILE_TYPE) && path.basename(srcFile) != TEMPLATE_FILE_TYPE && 
               fs.lstatSync(srcFile).isFile()) {
               templateFiles.push(srcFile);
               return isSrcNotTgt;
@@ -114,7 +131,7 @@ export function configure(args: types.ConfigureArgs): Promise<string> {
             return reject(error);
 
           const promises = templateFiles.map((srcFile) => {
-            const tgtFile = path.relative(srcDir, srcFile).slice(0, -1 * TEMPLATE_FILE_EXT.length);
+            const tgtFile = path.relative(srcDir, srcFile).slice(0, -1 * TEMPLATE_FILE_TYPE.length);
             return variables.eval(srcFile, path.join(tgtDir, tgtFile));
           });
 

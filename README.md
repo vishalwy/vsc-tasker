@@ -6,15 +6,15 @@ VS Code extension to configure & execute tasks.
 * The command allows you to configure the `.vscode` directory. 
 * The command expects you to supply a directory `<template-dir>` and the content is copied to `.vscode` directory.
 * Store your [Mustache](https://github.com/janl/mustache.js) templates with `.tct` extension in `<template-dir>`. 
-* The command will interpolate the content of `.tct` files using `<template-dir>\variables.json`.
+* The command interpolates the content of `.tct` files using `<template-dir>\tasker.variables.json`.
 * After interpolation `<template-dir>\path\to\x.y.tct` will be stored as `.vscode\path\to\x.y`.
 
-Format of `variables.json` is given below
+Format of `tasker.variables.json` is given below
 ```typescript
 {
-  [variableName: string]: {  //variable name
+  [variableName: string]: {  //variable name should match regex ^[A-Z0-9_]+$
     description?: string,  //description of the variable to be shown
-    default?: string  //default value for the variable
+    values?: string[]  //values.length > 1 shows a list, else an input box with values[0] filled in
   }
 }
 ```
