@@ -4,63 +4,114 @@ import * as types from './types';
 
 class Tasker {
   public readonly name: string;
-  private trimOutput: boolean;
-  private output: string;
-  public taskExec: vscode.TaskExecution | null;
+  public readonly trimOutput: boolean;
+  private output: string = '';
+  private startTaskHandler: vscode.Disposable | null = null;
+  private endTaskHandler: vscode.Disposable | null = null;
+  private openTerminalHandler: vscode.Disposable | null = null;
+  private writeDataHandler: vscode.Disposable | null = null;
+  private execution: vscode.TaskExecution | null = null;
 
   private promise: {
-    resolve?: (value?: any) => void;
-    reject?: (error?: any) => void;
-  };
+    instance: Promise<string> | null,
+    callbacks: {
+      resolve: (value?: any) => void;
+      reject: (error?: any) => void;
+    } | null;
+  } = {instance: null, callbacks: null};
 
   public constructor(name: string, trimOutput: boolean = true) {
     this.name = name;
     this.trimOutput = trimOutput;
-    this.output = '';
-    this.promise = {};
-    this.taskExec = null;
+    this.resolve = this.resolve.bind(this);
+    this.reject = this.reject.bind(this);
   }
 
-  public resolve(value?: any): boolean {
-    if(this.promise.resolve) {
-      if(typeof value == 'undefined')
-        value = this.trimOutput ? this.output.trim() : this.output;
-
-      this.promise.resolve(value);
-      return true;
-    }
-
-    return false;
+  public getOutput(): string {
+    return this.trimOutput ? this.output.trim() : this.output;
   }
 
-  private reject(error?: any): boolean {
-    if(this.promise.reject) {
-      this.promise.reject(error || new Error(`${this.name} - Failed run!`));
-      return true;
-    }
-    
-    return false;
+  public terminate(): void {
+    this.execution && this.execution.terminate();
+    this.execution = null;
   }
 
   public run(): Promise<string> {
-    return new Promise((resolve, reject) => {
-      this.promise = {resolve, reject};
+    this.promise.instance = this.promise.instance || new Promise((resolve, reject) => {
+      this.promise.callbacks = {resolve, reject};
+      this.setupHanlders();
       
       vscode.tasks.fetchTasks().then((tasks) => {
         for(let i = 0; i < tasks.length; ++i) {
           if(tasks[i].name == this.name)			
-            return vscode.tasks.executeTask(tasks[i]).then((taskExec) => {
-              this.taskExec = taskExec;
-            }, reject);
+            return vscode.tasks.executeTask(tasks[i]).then((execution) => {
+              this.execution = execution;
+            }, this.reject);
         }
 
-        reject(new Error(`${this.name} - Task not found`));
-      }, reject);
+        this.reject(new Error(`${this.name} - Task not found`));
+      }, this.reject);
     });
+
+    return this.promise.instance;
   }
 
-  public append(data: string): void {
-    this.output += data;
+  private resolve(value?: any): void {
+    this.done(true, value);
+  }
+
+  private reject(error?: any): void {
+    this.done(false, error);
+  }
+
+  private done(isError: boolean, valueOrError: any): void {
+    if(!this.promise.callbacks)
+      return
+
+    const callback = isError ? this.promise.callbacks.reject : this.promise.callbacks.resolve;
+    this.promise.callbacks = null;
+    this.startTaskHandler && this.startTaskHandler.dispose();
+    this.endTaskHandler && this.endTaskHandler.dispose();
+    this.openTerminalHandler && this.openTerminalHandler.dispose();
+    this.writeDataHandler && this.writeDataHandler.dispose();
+    callback(valueOrError);
+  }
+
+  private setWriteDataHandler(terminal: vscode.Terminal): boolean {
+    if(terminal.name.indexOf('Task - ' + this.name) >= 0) {
+      this.writeDataHandler = (<any>terminal).onDidWriteData((data: any) => {
+        this.output += data;
+      });
+
+      return true;
+    }
+
+    return false;
+  }
+
+  private setupHanlders(): void {
+    this.startTaskHandler = vscode.tasks.onDidStartTask((e) => {
+      if(this.name != e.execution.task.name)
+        return;
+
+      const terminals = vscode.window.terminals;
+      const count = terminals.length;
+
+      for(let i = 0; i < count; ++i) {
+        if(this.setWriteDataHandler(terminals[i]))
+          break;
+      }
+
+      if(!this.writeDataHandler) {
+        this.openTerminalHandler = vscode.window.onDidOpenTerminal((terminal) => {
+          this.setWriteDataHandler(terminal);
+        }); 
+      }
+    });
+
+    this.endTaskHandler = vscode.tasks.onDidEndTask((e) => {
+      this.name == e.execution.task.name && this.resolve(this.getOutput());
+    });
   }
 }
 
@@ -70,61 +121,7 @@ export function run(args: types.RunArgs): Promise<string> {
 
     if(!args.name)
       return reject(new Error('No task name given'));
-
-    let startTaskHandler: vscode.Disposable | null = null;
-    let endTaskHandler: vscode.Disposable | null = null;
-    let openTerminalHandler: vscode.Disposable | null = null;
-    let writeDataHandler: vscode.Disposable | null = null;
-    const tasker: Tasker = new Tasker(args.name, args.trimOutput);
-
-    function done(): void {
-      startTaskHandler && startTaskHandler.dispose();
-      endTaskHandler && endTaskHandler.dispose();
-      openTerminalHandler && openTerminalHandler.dispose();
-      writeDataHandler && writeDataHandler.dispose();
-    }
-
-    function setWriteDataHandler(terminal: vscode.Terminal): boolean {
-      if(terminal.name.indexOf('Task - ' + tasker.name) >= 0) {
-        writeDataHandler = (<any>terminal).onDidWriteData((data: any) => {
-          tasker.append(data);
-        });
-
-        return true;
-      }
-
-      return false;
-    }
-
-    startTaskHandler = vscode.tasks.onDidStartTask((e) => {
-      if(!tasker || tasker.name != e.execution.task.name)
-        return;
-
-      const terminals = vscode.window.terminals;
-      const count = terminals.length;
-
-      for(let i = 0; i < count; ++i) {
-        if(setWriteDataHandler(terminals[i]))
-          break;
-      }
-
-      if(!writeDataHandler) {
-        openTerminalHandler = vscode.window.onDidOpenTerminal((terminal) => {
-          setWriteDataHandler(terminal);
-        }); 
-      }
-    });
-
-    endTaskHandler = vscode.tasks.onDidEndTask((e) => {
-      tasker.name == e.execution.task.name && tasker.resolve();
-    });
-
-    tasker.run().then((value) => {
-      done();
-      resolve(value);
-    }, (error) => {
-      done();
-      reject(error);
-    });
+    
+    (new Tasker(args.name, args.trimOutput)).run().then(resolve, reject);
   });
 }
