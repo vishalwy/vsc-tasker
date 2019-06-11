@@ -2,8 +2,10 @@
 import * as vscode from 'vscode';
 import * as types from './types';
 
-class Tasker {
-  public readonly name: string;
+const TASK_PREFIX = 'tasker@';
+
+class Runner {
+  public readonly task: vscode.Task;
   public readonly trimOutput: boolean;
   private output: string = '';
   private startTaskHandler: vscode.Disposable | null = null;
@@ -20,11 +22,20 @@ class Tasker {
     } | null;
   } = {instance: null, callbacks: null};
 
-  public constructor(name: string, trimOutput: boolean = true) {
-    this.name = name;
+  public static async getTask(name: string): Promise<vscode.Task> {
+    const tasks = await vscode.tasks.fetchTasks();
+
+    for(let i = 0; i < tasks.length; ++i) {
+      if(tasks[i].name == name) 
+        return tasks[i];
+    }
+    
+    throw new Error(`${name} - Task not found`);
+  }
+
+  public constructor(task: vscode.Task, trimOutput: boolean) {
+    this.task = task;
     this.trimOutput = trimOutput;
-    this.resolve = this.resolve.bind(this);
-    this.reject = this.reject.bind(this);
   }
 
   public getOutput(): string {
@@ -36,32 +47,18 @@ class Tasker {
     this.execution = null;
   }
 
-  public run(): Promise<string> {
-    this.promise.instance = this.promise.instance || new Promise((resolve, reject) => {
-      this.promise.callbacks = {resolve, reject};
-      this.setupHanlders();
-      
-      vscode.tasks.fetchTasks().then((tasks) => {
-        for(let i = 0; i < tasks.length; ++i) {
-          if(tasks[i].name == this.name)			
-            return vscode.tasks.executeTask(tasks[i]).then((execution) => {
-              this.execution = execution;
-            }, this.reject);
-        }
+  public async execute(): Promise<string> {
+    this.promise.instance = this.promise.instance || (async () => {
+      const promise = new Promise<string>((resolve, reject) => {
+        this.promise.callbacks = {resolve, reject};
+      });
 
-        this.reject(new Error(`${this.name} - Task not found`));
-      }, this.reject);
-    });
+      this.setupHandlers();
+      this.execution = await vscode.tasks.executeTask(this.task);
+      return promise;
+    })();
 
     return this.promise.instance;
-  }
-
-  private resolve(value?: any): void {
-    this.done(true, value);
-  }
-
-  private reject(error?: any): void {
-    this.done(false, error);
   }
 
   private done(isError: boolean, valueOrError: any): void {
@@ -78,8 +75,8 @@ class Tasker {
   }
 
   private setWriteDataHandler(terminal: vscode.Terminal): boolean {
-    if(terminal.name.indexOf('Task - ' + this.name) >= 0) {
-      this.writeDataHandler = (<any>terminal).onDidWriteData((data: any) => {
+    if(terminal.name.indexOf(this.task.name) >= 0) {
+      this.writeDataHandler = (<any>terminal).onDidWriteData((data: string) => {
         this.output += data;
       });
 
@@ -89,9 +86,9 @@ class Tasker {
     return false;
   }
 
-  private setupHanlders(): void {
+  private setupHandlers(): void {
     this.startTaskHandler = vscode.tasks.onDidStartTask((e) => {
-      if(this.name != e.execution.task.name)
+      if(this.task.name != e.execution.task.name)
         return;
 
       const terminals = vscode.window.terminals;
@@ -110,18 +107,39 @@ class Tasker {
     });
 
     this.endTaskHandler = vscode.tasks.onDidEndTask((e) => {
-      this.name == e.execution.task.name && this.resolve(this.getOutput());
+      this.task.name == e.execution.task.name && this.done(false, this.getOutput());
     });
   }
 }
 
-export function run(args: types.RunArgs): Promise<string> {
-  return new Promise((resolve, reject) => {
-    args = args || {};
+export async function run(args: types.RunArgs): Promise<string> {
+  const {taskName = '', trimOutput = true, dummyCommand = 'printf ""'} = args || {};
 
-    if(!args.name)
-      return reject(new Error('No task name given'));
-    
-    (new Tasker(args.name, args.trimOutput)).run().then(resolve, reject);
-  });
+  if(!taskName)
+    throw new Error('No task name given');
+
+  const currentTaskName = `${TASK_PREFIX}${Date.now()}`;
+  const task = await Runner.getTask(taskName);
+  task.name = currentTaskName;
+  task.presentationOptions = task.presentationOptions || {};
+  task.presentationOptions.panel = vscode.TaskPanelKind.Shared
+  
+  if(dummyCommand) {
+    const dummyTask = new vscode.Task(
+      {type: 'shell'}, vscode.TaskScope.Workspace, 
+      currentTaskName, 'Workspace', new vscode.ShellExecution(dummyCommand)
+    );
+
+    dummyTask.presentationOptions = {
+      echo: false,
+      clear: false,
+      panel: vscode.TaskPanelKind.Shared,
+      reveal: vscode.TaskRevealKind.Never,
+      showReuseMessage: false
+    };
+
+    await (new Runner(dummyTask, true)).execute();
+  }
+
+  return (new Runner(task, trimOutput)).execute();
 }

@@ -1,8 +1,9 @@
 'use strict';
 
 export interface RunArgs {
-  name: string,  //task name
-  trimOutput?: boolean  //whether to trim whitespace from the output
+  taskName: string,  //task name to execute
+  trimOutput?: boolean  //whether to trim whitespace from the output; default to true
+  dummyCommand?: string  //dummy command to preallocate a terminal for the task; default to 'printf ""'
 }
 
 export interface ConfigureArgs {
@@ -12,7 +13,8 @@ export interface ConfigureArgs {
 export interface VariableConfig {
   [variableName: string]: {  //variable name should match regex ^[A-Z0-9_]+$
     description?: string,  //description of the variable to be shown
-    values?: string[]  //values.length > 1 shows a list, else an input box with values[0] filled in
+    values?: string[],  //values.length > 1 shows a list, else an input box with values[0] filled in
+    required?: boolean  //for simple input, this implies the value cannot be empty; default to true
   }
 }
 
@@ -30,6 +32,9 @@ export const VariableSchema = {
           'items': {
             'type': 'string'
           }
+        },
+        'required': {
+          'type': 'boolean'
         }
       },
       'additionalProperties': false
