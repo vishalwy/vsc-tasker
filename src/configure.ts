@@ -65,7 +65,12 @@ class Variables {
       prompt: description,
       ignoreFocusOut: true,
       value: values.length ? values[0] : '',
-      validateInput: (value) =>  required && value === '' ? 'Value cannot be empty' : ''
+      validateInput: (value) => {
+        if(required && (!value || !value.trim()))
+          return 'Value cannot be empty or contain only whitespaces';
+          
+        return '';
+      }
     });
   }
 }
