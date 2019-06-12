@@ -34,7 +34,18 @@
         "command": "tasker.configure",
         "category": "Tasker"
       }
-    ]
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Tasker",
+      "properties": {
+        "tasker.pseudoCommand": {
+          "type": "string",
+          "default": "printf ''",
+          "description": "Command to run before the actual task, in order to force a terminal for the output."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

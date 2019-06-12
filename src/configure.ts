@@ -7,7 +7,8 @@ import {Validator} from 'jsonschema';
 import * as types from './types';
 
 const TEMPLATE_FILE_TYPE = '.tct';
-const VARIABLE_FILE_NAME = 'tasker.variables.json'
+const VARIABLE_FILE_NAME = 'tasker.variables.json';
+const VSCODE_DIR = '.vscode';
 const mustache = require('mustache');
 mustache.escape = (text: string) => JSON.stringify(text).replace(/(^")|("$)/g, '');
 
@@ -23,7 +24,7 @@ class Variables {
     const validation = (new Validator()).validate(config, types.VariableSchema);
 
     if(validation.errors.length)
-      throw new Error(`${validation.errors[0].property} - ${validation.errors[0].message}`)
+      throw new Error(`${variablesFile}: ${validation.errors[0].property} - ${validation.errors[0].message}`);
 
     for(let i = 0, variables = Object.keys(config); i < variables.length; ++i) {
       let value = await this.readVariable(config, variables[i]);
@@ -149,7 +150,7 @@ class Configurer {
 
   private async process(folder: vscode.WorkspaceFolder, srcDir: string): Promise<boolean> {
     const variables = new Variables();
-    const tgtDir = path.join(folder.uri.fsPath, '.vscode');
+    const tgtDir = path.join(folder.uri.fsPath, VSCODE_DIR);
     let variablesFile = path.join(srcDir, VARIABLE_FILE_NAME);
 
     if(!fs.existsSync(variablesFile) || !fs.lstatSync(variablesFile).isFile()) {

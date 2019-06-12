@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import * as types from './types';
 
 const TASK_PREFIX = 'tasker@';
+const PSEUDO_COMMAND = 'printf \'\'';
 
 class Runner {
   public readonly task: vscode.Task;
@@ -17,9 +18,9 @@ class Runner {
   private promise: {
     instance: Promise<string> | null,
     callbacks: {
-      resolve: (value?: any) => void;
-      reject: (error?: any) => void;
-    } | null;
+      resolve: (value?: any) => void,
+      reject: (error?: any) => void
+    } | null
   } = {instance: null, callbacks: null};
 
   public static async getTask(name: string): Promise<vscode.Task> {
@@ -113,8 +114,9 @@ class Runner {
 }
 
 export async function run(args: types.RunArgs): Promise<string> {
-  const {taskName = '', trimOutput = true, dummyCommand = 'printf ""'} = args || {};
-
+  const {taskName = '', trimOutput = true} = args || {};
+  const pseudoCommand = vscode.workspace.getConfiguration('tasker').get<string>('pseudoCommand', PSEUDO_COMMAND);
+  
   if(!taskName)
     throw new Error('No task name given');
 
@@ -122,15 +124,15 @@ export async function run(args: types.RunArgs): Promise<string> {
   const task = await Runner.getTask(taskName);
   task.name = currentTaskName;
   task.presentationOptions = task.presentationOptions || {};
-  task.presentationOptions.panel = vscode.TaskPanelKind.Shared
+  task.presentationOptions.panel = vscode.TaskPanelKind.Shared;
   
-  if(dummyCommand) {
-    const dummyTask = new vscode.Task(
+  if(pseudoCommand) {
+    const pseudoTask = new vscode.Task(
       {type: 'shell'}, vscode.TaskScope.Workspace, 
-      currentTaskName, 'Workspace', new vscode.ShellExecution(dummyCommand)
+      currentTaskName, 'Workspace', new vscode.ShellExecution(pseudoCommand)
     );
 
-    dummyTask.presentationOptions = {
+    pseudoTask.presentationOptions = {
       echo: false,
       clear: false,
       panel: vscode.TaskPanelKind.Shared,
@@ -138,7 +140,7 @@ export async function run(args: types.RunArgs): Promise<string> {
       showReuseMessage: false
     };
 
-    await (new Runner(dummyTask, true)).execute();
+    await (new Runner(pseudoTask, true)).execute();
   }
 
   return (new Runner(task, trimOutput)).execute();
