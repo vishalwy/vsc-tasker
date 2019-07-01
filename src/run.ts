@@ -48,14 +48,20 @@ class Runner {
     this.execution = null;
   }
 
-  public async execute(): Promise<string> {
+  public execute(): Promise<string> {
     this.promise.instance = this.promise.instance || (async () => {
       const promise = new Promise<string>((resolve, reject) => {
         this.promise.callbacks = {resolve, reject};
       });
 
-      this.setupHandlers();
-      this.execution = await vscode.tasks.executeTask(this.task);
+      try {
+        this.setupHandlers();
+        this.execution = await vscode.tasks.executeTask(this.task);
+      } catch(error) {
+        this.disposeCallbacks();
+        throw error;
+      }
+
       return promise;
     })();
 
@@ -67,12 +73,22 @@ class Runner {
       return
 
     const callback = isError ? this.promise.callbacks.reject : this.promise.callbacks.resolve;
-    this.promise.callbacks = null;
+    this.disposeCallbacks();
+    callback(valueOrError);
+  }
+
+  private disposeCallbacks(): void {
     this.startTaskHandler && this.startTaskHandler.dispose();
     this.endTaskHandler && this.endTaskHandler.dispose();
     this.openTerminalHandler && this.openTerminalHandler.dispose();
     this.writeDataHandler && this.writeDataHandler.dispose();
-    callback(valueOrError);
+
+    this.execution = null;
+    this.promise.callbacks = null;
+    this.startTaskHandler = null;
+    this.endTaskHandler = null;
+    this.openTerminalHandler = null;
+    this.writeDataHandler = null;
   }
 
   private setWriteDataHandler(terminal: vscode.Terminal): boolean {
@@ -125,7 +141,7 @@ export async function run(args: types.RunArgs): Promise<string> {
   task.name = currentTaskName;
   task.presentationOptions = task.presentationOptions || {};
   task.presentationOptions.panel = vscode.TaskPanelKind.Shared;
-  
+
   if(pseudoCommand) {
     const pseudoTask = new vscode.Task(
       {type: 'shell'}, vscode.TaskScope.Workspace, 

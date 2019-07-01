@@ -78,7 +78,7 @@ class Variables {
 class Configurer {
   private promise: Promise<boolean> | null = null;
 
-  public async execute(templateDir: string): Promise<boolean> {
+  public execute(templateDir: string): Promise<boolean> {
     this.promise =  this.promise || (async () => {
       const folder = await this.getWorkspaceFolder();
       const dir = folder && await this.getTemplateDir(folder, templateDir);
