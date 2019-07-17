@@ -36,6 +36,7 @@ Arguments can be supplied in the format given below
 ```typescript
 {
   taskName: string,  //task name to execute
+  outputTimeout: number,  //milliseconds to wait till the output is returned; the task continue to run
   trimOutput?: boolean  //whether to trim whitespace from the output; default to true
 }
 ```

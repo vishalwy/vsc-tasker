@@ -8,7 +8,9 @@ const PSEUDO_COMMAND = 'printf \'\'';
 class Runner {
   public readonly task: vscode.Task;
   public readonly trimOutput: boolean;
+  public readonly outputTimeout: number;
   private output: string = '';
+  private outputTimer: NodeJS.Timer | null = null;
   private startTaskHandler: vscode.Disposable | null = null;
   private endTaskHandler: vscode.Disposable | null = null;
   private openTerminalHandler: vscode.Disposable | null = null;
@@ -34,9 +36,10 @@ class Runner {
     throw new Error(`${name} - Task not found`);
   }
 
-  public constructor(task: vscode.Task, trimOutput: boolean) {
+  public constructor(task: vscode.Task, trimOutput: boolean, outputTimeout: number) {
     this.task = task;
     this.trimOutput = trimOutput;
+    this.outputTimeout = outputTimeout > 0 ? outputTimeout : 0;
   }
 
   public getOutput(): string {
@@ -78,11 +81,13 @@ class Runner {
   }
 
   private disposeCallbacks(): void {
+    this.outputTimer && clearTimeout(this.outputTimer)
     this.startTaskHandler && this.startTaskHandler.dispose();
     this.endTaskHandler && this.endTaskHandler.dispose();
     this.openTerminalHandler && this.openTerminalHandler.dispose();
     this.writeDataHandler && this.writeDataHandler.dispose();
 
+    this.outputTimer = null;
     this.execution = null;
     this.promise.callbacks = null;
     this.startTaskHandler = null;
@@ -96,6 +101,9 @@ class Runner {
       this.writeDataHandler = (<any>terminal).onDidWriteData((data: string) => {
         this.output += data;
       });
+
+      if(this.outputTimeout)
+        this.outputTimer = setTimeout(() => this.done(false, this.getOutput()), this.outputTimeout)
 
       return true;
     }
@@ -130,22 +138,27 @@ class Runner {
 }
 
 export async function run(args: types.RunArgs): Promise<string> {
-  const {taskName = '', trimOutput = true} = args || {};
+  const {taskName = '', trimOutput = true, outputTimeout = 0} = args || {};
   const pseudoCommand = vscode.workspace.getConfiguration('tasker').get<string>('pseudoCommand', PSEUDO_COMMAND);
   
   if(!taskName)
     throw new Error('No task name given');
 
+  let task = await Runner.getTask(taskName);
+  const taskScope = task.scope || vscode.TaskScope.Workspace;
   const currentTaskName = `${TASK_PREFIX}${Date.now()}`;
-  const task = await Runner.getTask(taskName);
-  task.name = currentTaskName;
-  task.presentationOptions = task.presentationOptions || {};
+  const presentationOptions = task.presentationOptions || {};
+  task = new vscode.Task(
+    task.definition, taskScope, currentTaskName, 
+    task.source, task.execution, task.problemMatchers
+  );
+  task.presentationOptions = presentationOptions;
   task.presentationOptions.panel = vscode.TaskPanelKind.Shared;
 
   if(pseudoCommand) {
     const pseudoTask = new vscode.Task(
-      {type: 'shell'}, vscode.TaskScope.Workspace, 
-      currentTaskName, 'Workspace', new vscode.ShellExecution(pseudoCommand)
+      {type: 'shell'}, taskScope, currentTaskName, 
+      task.source, new vscode.ShellExecution(pseudoCommand)
     );
 
     pseudoTask.presentationOptions = {
@@ -156,8 +169,8 @@ export async function run(args: types.RunArgs): Promise<string> {
       showReuseMessage: false
     };
 
-    await (new Runner(pseudoTask, true)).execute();
+    await (new Runner(pseudoTask, true, 0)).execute();
   }
 
-  return (new Runner(task, trimOutput)).execute();
+  return (new Runner(task, trimOutput, outputTimeout)).execute();
 }
